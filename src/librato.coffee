@@ -20,7 +20,7 @@ parseTimePeroid = (time) ->
   matchData = /(\d+)?\s*(second|minute|hour|day|week)s?/.exec(time)
   return unless matchData[2]
 
-  amount = matchData[1] ? parseInt(matchData, 10) : 1
+  amount = if matchData[1] then parseInt(matchData, 10) else 1
   return amount * switch matchData[2]
     when 'second'
       1
