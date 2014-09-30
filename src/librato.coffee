@@ -9,18 +9,18 @@
 #   HUBOT_LIBRATO_TOKEN
 #
 # Commands:
-#   hubot graph me <instrument> [over the last <time peroid>] - Get graph from
+#   hubot graph me <instrument> [over the last <time period>] - Get graph from
 #     librato
 #
 # Author:
 #   Eric Koslow
 
 
-parseTimePeroid = (time) ->
+parseTimePeriod= (time) ->
   matchData = /(\d+)?\s*(second|minute|hour|day|week)s?/.exec(time)
   return unless matchData[2]
 
-  amount = matchData[1] ? parseInt(matchData, 10) : 1
+  amount = if matchData[1] then parseInt(matchData, 10) else 1
   return amount * switch matchData[2]
     when 'second'
       1
@@ -72,19 +72,19 @@ createSnapshot = (url, formData, msg, robot) ->
         json = JSON.parse(body)
         getSnapshot(json['uri'])
 
-getGraphForIntrument = (inst, msg, time_peroid, robot) ->
-  timePeroidInSeconds = parseTimePeroid(time_peroid)
+getGraphForIntrument = (inst, msg, time_period, robot) ->
+  timePeriodInSeconds = parseTimePeriod(time_period)
 
-  unless timePeroidInSeconds
-    msg.reply "Sorry, I couldn't understand the time peroid #{time_peroid}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
+  unless timePeriodInSeconds
+    msg.reply "Sorry, I couldn't understand the time period #{time_period}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
     return
 
   url = "https://metrics.librato.com/snap_shot?instrument_id=#{inst['id']}"
-  formData = "instrument_id=#{inst['id']}&duration=#{timePeroidInSeconds}"
+  formData = "instrument_id=#{inst['id']}&duration=#{timePeriodInSeconds}"
 
   createSnapshot(url, formData, msg, robot)
 
-processIntrumentResponse = (res, msg, time_peroid, robot) ->
+processIntrumentResponse = (res, msg, time_period, robot) ->
   json = JSON.parse(res.body)
   found = json['query']['found']
   if found == 0
@@ -93,12 +93,13 @@ processIntrumentResponse = (res, msg, time_peroid, robot) ->
     names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst['name']
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
-    getGraphForIntrument(json['query']['instruments'][0], msg, time_peroid, robot)
+    getGraphForIntrument(json['query']['instruments'][0], msg, time_period, robot)
 
 module.exports = (robot) ->
   robot.respond /graph me ([\w ]+)$/i, (msg) ->
-    instrement, time_peroid = msg.match[1].split('over the last')
-    time_peroid ||= 'hour'
+    instrument = time_period = msg.match[1].split('over the last')
+
+    time_period ||= 'hour'
 
     user = process.env.HUBOT_LIBRATO_USER
     pass = process.env.HUBOT_LIBRATO_TOKEN
@@ -106,9 +107,9 @@ module.exports = (robot) ->
 
     robot.http("https://metrics.librato.com/metrics-api/v1/instruments&name=#{instrument}")
       .headers(Authorization: auth, Accept: 'application/json')
-      get() (err, res, body) ->
+      .get() (err, res, body) ->
         switch res.statusCode
           when 200
-            processIntrumentResponse(res, msg, time_peroid, robot)
+            processIntrumentResponse(res, msg, time_period, robot)
           else
             msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
