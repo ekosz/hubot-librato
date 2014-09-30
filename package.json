@@ -1,0 +1,25 @@
+{
+  "name": "hubot-librato",
+  "version": "0.0.1",
+  "description": "Hubot script that gets your graphs from Librato",
+  "main": "index.coffee",
+  "author": "Eric Koslow <ekoslow@gmail.com> (https://github.com/ekosz)",
+  "keywords": [
+    "hubot",
+    "hubot-scripts",
+    "librato"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/ekosz/hubot-librato",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekosz/hubot-librato.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ekosz/hubot-librato/issues"
+  },
+  "dependencies": {
+    "coffee-script": "1.8.x"
+  },
+  "main": "index.coffee"
+}

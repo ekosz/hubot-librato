@@ -1,11 +1,12 @@
 # Description:
-#   None
+#   Pulls graphs from Librato
 #
 # Dependencies:
 #   None
 #
 # Configuration:
-#   None
+#   LIBRATO_USER
+#   LIBRATO_TOKEN
 #
 # Commands:
 #   hubot graph me <instrument> [over the last <time peroid>] - Get graph from
