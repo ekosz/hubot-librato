@@ -34,31 +34,30 @@ parseTimePeroid = (time) ->
       60 * 60 * 24 * 7
 
 getSnapshot = (url, msg, robot) ->
-  responseHandler = (err, res, body) ->
-    switch res.statusCode
-      when 200
-        json = JSON.parse(body)
-        if json['image_href']
-          msg.reply json['image_href']
-        else
-          setTimeout ( ->
-            getSnapshot(url, msg, robot)
-          ), 100
-      when 204
-        setTimeout ( ->
-          getSnapshot(url, msg, robot)
-        ), 100
-      else
-        msg.reply "Unable to snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
-
   user = process.env.HUBOT_LIBRATO_USER
   pass = process.env.HUBOT_LIBRATO_TOKEN
   auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
   robot.http(url)
     .headers(Authorization: auth, Accept: 'application/json')
-    .get(responseHandler)
+    .get() (err, res, body) ->
+      switch res.statusCode
+        when 200
+          json = JSON.parse(body)
+          if json['image_href']
+            msg.reply json['image_href']
+          else
+            setTimeout ( ->
+              getSnapshot(url, msg, robot)
+            ), 100
+        when 204
+          setTimeout ( ->
+            getSnapshot(url, msg, robot)
+          ), 100
+        else
+          msg.reply "Unable to get snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-createSnapshot = (url, formData, msg, robot) ->
+createSnapshot = (inst, formData, msg, robot) ->
+  url = "https://metrics.librato.com/snap_shot?instrument_id=#{inst['id']}"
   user = process.env.HUBOT_LIBRATO_USER
   pass = process.env.HUBOT_LIBRATO_TOKEN
   auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
@@ -66,11 +65,11 @@ createSnapshot = (url, formData, msg, robot) ->
   robot.http(url)
     .headers(Authorization: auth, Accept: 'application/json')
     .post(formData) (err, res, body) ->
-      if err
-        msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
-      else
+      if res.statusCode == 201
         json = JSON.parse(body)
-        getSnapshot(json['uri'])
+        getSnapshot(json['uri'], msg, robot)
+      else
+        msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
 getGraphForIntrument = (inst, msg, timePeriod, robot) ->
   timePeroidInSeconds = parseTimePeroid(timePeriod)
@@ -79,13 +78,12 @@ getGraphForIntrument = (inst, msg, timePeriod, robot) ->
     msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
     return
 
-  url = "https://metrics.librato.com/snap_shot?instrument_id=#{inst['id']}"
   formData = "instrument_id=#{inst['id']}&duration=#{timePeroidInSeconds}"
 
-  createSnapshot(url, formData, msg, robot)
+  createSnapshot(inst, formData, msg, robot)
 
-processIntrumentResponse = (res, msg, timePeriod, robot) ->
-  json = JSON.parse(res.body)
+processIntrumentResponse = (body, msg, timePeriod, robot) ->
+  json = JSON.parse(body)
   found = json['query']['found']
   if found == 0
     msg.reply "Sorry, couldn't find that graph!"
@@ -93,7 +91,7 @@ processIntrumentResponse = (res, msg, timePeriod, robot) ->
     names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst['name']
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
-    getGraphForIntrument(json['query']['instruments'][0], msg, timePeriod, robot)
+    getGraphForIntrument(json['instruments'][0], msg, timePeriod, robot)
 
 module.exports = (robot) ->
   robot.respond /graph me ([\w ]+)$/i, (msg) ->
@@ -104,11 +102,11 @@ module.exports = (robot) ->
     pass = process.env.HUBOT_LIBRATO_TOKEN
     auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
 
-    robot.http("https://metrics.librato.com/metrics-api/v1/instruments&name=#{instrument}")
+    robot.http("https://metrics-api.librato.com/v1/instruments?name=#{escape(instrument)}")
       .headers(Authorization: auth, Accept: 'application/json')
       .get() (err, res, body) ->
         switch res.statusCode
           when 200
-            processIntrumentResponse(res, msg, timePeriod, robot)
+            processIntrumentResponse(body, msg, timePeriod, robot)
           else
-            msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
+            msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
