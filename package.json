@@ -20,6 +20,5 @@
   },
   "dependencies": {
     "coffee-script": "1.8.x"
-  },
-  "main": "index.coffee"
+  }
 }
