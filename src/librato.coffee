@@ -72,11 +72,11 @@ createSnapshot = (url, formData, msg, robot) ->
         json = JSON.parse(body)
         getSnapshot(json['uri'])
 
-getGraphForIntrument = (inst, msg, time_peroid, robot) ->
-  timePeroidInSeconds = parseTimePeroid(time_peroid)
+getGraphForIntrument = (inst, msg, timePeriod, robot) ->
+  timePeroidInSeconds = parseTimePeroid(timePeriod)
 
   unless timePeroidInSeconds
-    msg.reply "Sorry, I couldn't understand the time peroid #{time_peroid}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
+    msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
     return
 
   url = "https://metrics.librato.com/snap_shot?instrument_id=#{inst['id']}"
@@ -84,7 +84,7 @@ getGraphForIntrument = (inst, msg, time_peroid, robot) ->
 
   createSnapshot(url, formData, msg, robot)
 
-processIntrumentResponse = (res, msg, time_peroid, robot) ->
+processIntrumentResponse = (res, msg, timePeriod, robot) ->
   json = JSON.parse(res.body)
   found = json['query']['found']
   if found == 0
@@ -93,12 +93,12 @@ processIntrumentResponse = (res, msg, time_peroid, robot) ->
     names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst['name']
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
-    getGraphForIntrument(json['query']['instruments'][0], msg, time_peroid, robot)
+    getGraphForIntrument(json['query']['instruments'][0], msg, timePeriod, robot)
 
 module.exports = (robot) ->
   robot.respond /graph me ([\w ]+)$/i, (msg) ->
-    instrement, time_peroid = msg.match[1].split('over the last')
-    time_peroid ||= 'hour'
+    [instrument, timePeriod] = msg.match[1].split('over the last')
+    timePeriod ||= 'hour'
 
     user = process.env.HUBOT_LIBRATO_USER
     pass = process.env.HUBOT_LIBRATO_TOKEN
@@ -109,6 +109,6 @@ module.exports = (robot) ->
       get() (err, res, body) ->
         switch res.statusCode
           when 200
-            processIntrumentResponse(res, msg, time_peroid, robot)
+            processIntrumentResponse(res, msg, timePeriod, robot)
           else
             msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
