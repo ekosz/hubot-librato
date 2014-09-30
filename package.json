@@ -1,6 +1,6 @@
 {
   "name": "hubot-librato",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Hubot script that gets your graphs from Librato",
   "main": "index.coffee",
   "author": "Eric Koslow <ekoslow@gmail.com> (https://github.com/ekosz)",
