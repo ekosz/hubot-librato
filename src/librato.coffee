@@ -73,11 +73,15 @@ createSnapshot = (inst, time, msg, robot) ->
   robot.http(url)
     .headers(Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json')
     .post(data) (err, res, body) ->
-      if res.statusCode == 201
-        json = JSON.parse(body)
-        getSnapshot(json['uri'], msg, robot)
-      else
-        msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+      switch res.statusCode
+        when 201
+          json = JSON.parse(body)
+          msg.reply json['image_href']
+        when 202
+          json = JSON.parse(body)
+          getSnapshot(json['href'], msg, robot)
+        else
+          msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
 getGraphForIntrument = (inst, msg, timePeriod, robot) ->
   timePeriodInSeconds = parseTimePeriod(timePeriod)
