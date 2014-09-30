@@ -104,9 +104,9 @@ processIntrumentResponse = (body, msg, timePeriod, robot) ->
     getGraphForIntrument(json['instruments'][0], msg, timePeriod, robot)
 
 module.exports = (robot) ->
-  robot.respond /graph me ([\w ]+)$/i, (msg) ->
-    [instrument, timePeriod] = msg.match[1].split('over the last')
-    timePeriod ||= 'hour'
+  robot.respond /graph me ([\w ]+?)\s+(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?$/i, (msg) ->
+    instrument = msg.match[1]
+    timePeriod = msg.match[2] || 'hour'
 
     user = process.env.HUBOT_LIBRATO_USER
     pass = process.env.HUBOT_LIBRATO_TOKEN
