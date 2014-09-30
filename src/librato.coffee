@@ -5,8 +5,8 @@
 #   None
 #
 # Configuration:
-#   LIBRATO_USER
-#   LIBRATO_TOKEN
+#   HUBOT_LIBRATO_USER
+#   HUBOT_LIBRATO_TOKEN
 #
 # Commands:
 #   hubot graph me <instrument> [over the last <time peroid>] - Get graph from
@@ -51,16 +51,16 @@ getSnapshot = (url, msg, robot) ->
       else
         msg.reply "Unable to snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{res.body}"
 
-  user = process.env.LIBRATO_USER
-  pass = process.env.LIBRATO_TOKEN
+  user = process.env.HUBOT_LIBRATO_USER
+  pass = process.env.HUBOT_LIBRATO_TOKEN
   auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
   robot.http(url)
     .headers(Authorization: auth, Accept: 'application/json')
     .get(responseHandler)
 
 createSnapshot = (url, formData, msg, robot) ->
-  user = process.env.LIBRATO_USER
-  pass = process.env.LIBRATO_TOKEN
+  user = process.env.HUBOT_LIBRATO_USER
+  pass = process.env.HUBOT_LIBRATO_TOKEN
   auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
 
   robot.http(url)
@@ -100,8 +100,8 @@ module.exports = (robot) ->
     instrement, time_peroid = msg.match[1].split('over the last')
     time_peroid ||= 'hour'
 
-    user = process.env.LIBRATO_USER
-    pass = process.env.LIBRATO_TOKEN
+    user = process.env.HUBOT_LIBRATO_USER
+    pass = process.env.HUBOT_LIBRATO_TOKEN
     auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
 
     robot.http("https://metrics.librato.com/metrics-api/v1/instruments&name=#{instrument}")
