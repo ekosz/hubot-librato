@@ -106,7 +106,7 @@ module.exports = (robot) ->
 
     robot.http("https://metrics.librato.com/metrics-api/v1/instruments&name=#{instrument}")
       .headers(Authorization: auth, Accept: 'application/json')
-      get() (err, res, body) ->
+      .get() (err, res, body) ->
         switch res.statusCode
           when 200
             processIntrumentResponse(res, msg, timePeriod, robot)
