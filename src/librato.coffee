@@ -16,7 +16,7 @@
 #   Eric Koslow
 
 
-parseTimePeroid = (time) ->
+parseTimePeriod = (time) ->
   matchData = /(\d+)?\s*(second|minute|hour|day|week)s?/.exec(time)
   return unless matchData[2]
 
@@ -56,15 +56,23 @@ getSnapshot = (url, msg, robot) ->
         else
           msg.reply "Unable to get snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-createSnapshot = (inst, formData, msg, robot) ->
-  url = "https://metrics.librato.com/snap_shot?instrument_id=#{inst['id']}"
+createSnapshot = (inst, time, msg, robot) ->
+  url = "https://metrics-api.librato.com/v1/snapshots"
+  data = JSON.stringify({
+    subject: {
+      instrument: {
+        href: "https://metrics-api.librato.com/v1/instruments/#{inst.id}"
+      }
+    },
+    duration: time,
+  })
   user = process.env.HUBOT_LIBRATO_USER
   pass = process.env.HUBOT_LIBRATO_TOKEN
   auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
 
   robot.http(url)
-    .headers(Authorization: auth, Accept: 'application/json')
-    .post(formData) (err, res, body) ->
+    .headers(Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json')
+    .post(data) (err, res, body) ->
       if res.statusCode == 201
         json = JSON.parse(body)
         getSnapshot(json['uri'], msg, robot)
@@ -72,15 +80,13 @@ createSnapshot = (inst, formData, msg, robot) ->
         msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
 getGraphForIntrument = (inst, msg, timePeriod, robot) ->
-  timePeroidInSeconds = parseTimePeroid(timePeriod)
+  timePeriodInSeconds = parseTimePeriod(timePeriod)
 
-  unless timePeroidInSeconds
-    msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}. \nTry something like '[<number> ]<second|minute|hour|day|week>s'"
+  unless timePeriodInSeconds
+    msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}.\nTry something like '[<number> ]<second|minute|hour|day|week>s'"
     return
 
-  formData = "instrument_id=#{inst['id']}&duration=#{timePeroidInSeconds}"
-
-  createSnapshot(inst, formData, msg, robot)
+  createSnapshot(inst, timePeriodInSeconds, msg, robot)
 
 processIntrumentResponse = (body, msg, timePeriod, robot) ->
   json = JSON.parse(body)
@@ -88,7 +94,7 @@ processIntrumentResponse = (body, msg, timePeriod, robot) ->
   if found == 0
     msg.reply "Sorry, couldn't find that graph!"
   else if found > 1
-    names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst['name']
+    names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst.name
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
     getGraphForIntrument(json['instruments'][0], msg, timePeriod, robot)
