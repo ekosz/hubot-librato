@@ -56,12 +56,13 @@ getSnapshot = (url, msg, robot) ->
         else
           msg.reply "Unable to get snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-createSnapshot = (inst, time, msg, robot) ->
+createSnapshot = (inst, source, time, msg, robot) ->
   url = "https://metrics-api.librato.com/v1/snapshots"
   data = JSON.stringify({
     subject: {
       instrument: {
-        href: "https://metrics-api.librato.com/v1/instruments/#{inst.id}"
+        href: "https://metrics-api.librato.com/v1/instruments/#{inst.id}",
+        sources: source
       }
     },
     duration: time,
@@ -83,16 +84,16 @@ createSnapshot = (inst, time, msg, robot) ->
         else
           msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-getGraphForIntrument = (inst, msg, timePeriod, robot) ->
+getGraphForIntrument = (inst, source, msg, timePeriod, robot) ->
   timePeriodInSeconds = parseTimePeriod(timePeriod)
 
   unless timePeriodInSeconds
     msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}.\nTry something like '[<number> ]<second|minute|hour|day|week>s'"
     return
 
-  createSnapshot(inst, timePeriodInSeconds, msg, robot)
+  createSnapshot(inst, source, timePeriodInSeconds, msg, robot)
 
-processIntrumentResponse = (body, msg, timePeriod, robot) ->
+processIntrumentResponse = (body, source, msg, timePeriod, robot) ->
   json = JSON.parse(body)
   found = json['query']['found']
   if found == 0
@@ -101,12 +102,13 @@ processIntrumentResponse = (body, msg, timePeriod, robot) ->
     names = json['instruments'].reduce (acc, inst) -> acc + "\n" + inst.name
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
-    getGraphForIntrument(json['instruments'][0], msg, timePeriod, robot)
+    getGraphForIntrument(json['instruments'][0], source, msg, timePeriod, robot)
 
 module.exports = (robot) ->
-  robot.respond /graph me ([\w ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?$/i, (msg) ->
+  robot.respond /graph me ([\w ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?(?: source (\w+))?$/i, (msg) ->
     instrument = msg.match[1]
     timePeriod = msg.match[2] || 'hour'
+    source = msg.match[3] || '*'
 
     user = process.env.HUBOT_LIBRATO_USER
     pass = process.env.HUBOT_LIBRATO_TOKEN
@@ -117,6 +119,6 @@ module.exports = (robot) ->
       .get() (err, res, body) ->
         switch res.statusCode
           when 200
-            processIntrumentResponse(body, msg, timePeriod, robot)
+            processIntrumentResponse(body, source, msg, timePeriod, robot)
           else
             msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
