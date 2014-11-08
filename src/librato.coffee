@@ -63,7 +63,7 @@ createSnapshot = (inst, source, time, msg, robot) ->
     subject: {
       instrument: {
         href: "https://metrics-api.librato.com/v1/instruments/#{inst.id}",
-        sources: source
+        sources: [source]
       }
     },
     duration: time,
