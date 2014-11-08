@@ -98,7 +98,7 @@ processIntrumentResponse = (body, msg, timePeriod, robot) ->
   if found == 0
     msg.reply "Sorry, couldn't find that graph!"
   else if found > 1
-    names = json['query']['instruments'].reduce (acc, inst) -> acc + "\n" + inst.name
+    names = json['instruments'].reduce (acc, inst) -> acc + "\n" + inst.name
     msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
   else
     getGraphForIntrument(json['instruments'][0], msg, timePeriod, robot)
