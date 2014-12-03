@@ -30,7 +30,7 @@ ekosz> hubot graph me recent exceptions
 hubot> ekosz: http://snapshots.librato.com/instrument/xxxxxxxx-9999.png
 ```
 
-Limit the graph to a time peroid
+Limit the graph to a time period
 
 ```
 ekosz> hubot graph me purchases over the last 3 hours
