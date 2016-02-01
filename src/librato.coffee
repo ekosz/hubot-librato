@@ -106,7 +106,7 @@ processIntrumentResponse = (body, source, msg, timePeriod, robot) ->
     getGraphForIntrument(json['instruments'][0], source, msg, timePeriod, robot)
 
 module.exports = (robot) ->
-  robot.respond /graph me ([\w\. ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?(?: source (.+))?$/i, (msg) ->
+  robot.respond /graph me ([\w\.:\- ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?(?: source (.+))?$/i, (msg) ->
     instrument = msg.match[1]
     timePeriod = msg.match[2] || 'hour'
     source = msg.match[3] || '*'
