@@ -9,7 +9,11 @@
 #   HUBOT_LIBRATO_TOKEN
 #
 # Commands:
-#   hubot graph me <instrument> [over the last <time period>] [source <source>]
+#   hubot graph spaces
+#   - Get a list of possible spaces
+#   hubot graphs <space>
+#   - Get a list of possible graphs for a specific space
+#   hubot graph me <space>/<chart> [over the last <time period>] [source <source>] [type line|stacked|bignumber]
 #   - Get graph from Librato
 #
 # Author:
@@ -34,92 +38,162 @@ parseTimePeriod = (time) ->
     when 'week'
       60 * 60 * 24 * 7
 
-getSnapshot = (url, msg, robot) ->
-  user = process.env.HUBOT_LIBRATO_USER
-  pass = process.env.HUBOT_LIBRATO_TOKEN
-  auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
+getSpaces = (auth, robot, msg) ->
+  url = "https://metrics-api.librato.com/v1/spaces"
   robot.http(url)
-    .headers(Authorization: auth, Accept: 'application/json')
-    .get() (err, res, body) ->
-      switch res.statusCode
-        when 200
-          json = JSON.parse(body)
-          if json['image_href']
-            msg.reply json['image_href']
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            printSpaces(msg, JSON.parse(body))
           else
-            setTimeout ( ->
-              getSnapshot(url, msg, robot)
-            ), 100
-        when 204
-          setTimeout ( ->
-            getSnapshot(url, msg, robot)
-          ), 100
-        else
-          msg.reply "Unable to get snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+            msg.reply "Unable to get list of spaces from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-createSnapshot = (inst, source, time, msg, robot) ->
+getChartsForSpace = (auth, robot, msg, space) ->
+  url = "https://metrics-api.librato.com/v1/spaces?name=#{escape(space)}"
+  robot.http(url)
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            json = JSON.parse(body)
+            found = json['query']['found']
+            if found == 0
+              msg.reply "Sorry, couldn't find any spaces by name #{name}"
+            else
+              id = json['spaces'][0]['id']
+              getAllChartsForSpace(auth, robot, msg, id)
+          else
+            msg.reply "Unable to get list of spaces from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+
+getAllChartsForSpace = (auth, robot, msg, space) ->
+  url = "https://metrics-api.librato.com/v1/spaces/#{escape(space)}/charts"
+  robot.http(url)
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            printCharts(msg, JSON.parse(body))
+          else
+            msg.reply "Unable to get list of charts for space #{spaceId} from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+
+getSnapshot = (auth, robot, msg, space, chart, source, type, timePeriod) ->
+  url = "https://metrics-api.librato.com/v1/spaces"
+  robot.http(url)
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            json = JSON.parse(body)
+            s = findByName(space, json['spaces'])
+            if space
+              getChartForSpace(auth, robot, msg, s['id'], chart, source, type, timePeriod)
+            else
+              msg.reply "Sorry, couldn't find any spaces by name #{space}"
+          else
+            msg.reply "Unable to get list of spaces from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+
+getChartForSpace = (auth, robot, msg, spaceId, chartName, source, type, timePeriod) ->
+  url = "https://metrics-api.librato.com/v1/spaces/#{escape(spaceId)}/charts"
+  robot.http(url)
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            json = JSON.parse(body)
+            chart = findByName(chartName, json)
+            if chart 
+              createSnapshotForChart(auth, robot, msg, chart['id'], source, type, timePeriod)
+            else
+              msg.reply "Could not find chart #{chartName} in that space"
+
+          else
+            msg.reply "Unable to get list of spaces from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+
+createSnapshotForChart = (auth, robot, msg, chartId, source, type, timePeriod) ->
   url = "https://metrics-api.librato.com/v1/snapshots"
-  data = JSON.stringify({
-    subject: {
-      instrument: {
-        href: "https://metrics-api.librato.com/v1/instruments/#{inst.id}",
-        sources: [source]
+  data = {
+    "subject": {
+      "chart":{
+        "source": source,
+        "id": chartId,
+        "type": type
       }
     },
-    duration: time,
-  })
-  user = process.env.HUBOT_LIBRATO_USER
-  pass = process.env.HUBOT_LIBRATO_TOKEN
-  auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
-
+    "duration": parseTimePeriod(timePeriod)
+  }
   robot.http(url)
-    .headers(Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json')
-    .post(data) (err, res, body) ->
-      switch res.statusCode
-        when 201
-          json = JSON.parse(body)
-          msg.reply json['image_href']
-        when 202
-          json = JSON.parse(body)
-          getSnapshot(json['href'], msg, robot)
-        else
-          msg.reply "Unable to create snap shot from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+      .headers(Authorization: auth, Accept: 'application/json', 'Content-Type': 'application/json')
+      .post(JSON.stringify(data)) (err, res, body) ->
+        switch res.statusCode
+          when 202
+            json = JSON.parse(body)
+            getSnapshotImage(auth, robot, msg, json['href'])
+          else
+            msg.reply "Unable to create a snapshot of that chart from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-getGraphForIntrument = (inst, source, msg, timePeriod, robot) ->
-  timePeriodInSeconds = parseTimePeriod(timePeriod)
+getSnapshotImage = (auth, robot, msg, url) ->
+  robot.http(url)
+      .headers(Authorization: auth, Accept: 'application/json')
+      .get() (err, res, body) ->
+        switch res.statusCode
+          when 200
+            json = JSON.parse(body)
+            if json['image_href']
+              msg.reply json['image_href']
+            else
+              setTimeout ( ->
+                getSnapshotImage(auth, robot, msg, url)
+              ), 100
+          else
+            msg.reply "Unable to get a snapshot of that chart from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
 
-  unless timePeriodInSeconds
-    msg.reply "Sorry, I couldn't understand the time peroid #{timePeriod}.\nTry something like '[<number> ]<second|minute|hour|day|week>s'"
-    return
+findByName = (name, items) ->
+  for i in items
+    return i if i['name'] == name
 
-  createSnapshot(inst, source, timePeriodInSeconds, msg, robot)
+printSpaces = (msg, json) -> 
+  printQueryNames(msg, 'spaces', json)
 
-processIntrumentResponse = (body, source, msg, timePeriod, robot) ->
-  json = JSON.parse(body)
+printQueryNames = (msg, key, json) -> 
   found = json['query']['found']
-  if found == 0
-    msg.reply "Sorry, couldn't find that graph!"
-  else if found > 1
-    names = json['instruments'].reduce (acc, inst) -> acc + "\n" + inst.name
-    msg.reply "I found #{found} graphs named something like that. Which one did you mean?\n\n#{names}"
+  if found < 1
+    msg.reply "Sorry, couldn't find any #{key}"
   else
-    getGraphForIntrument(json['instruments'][0], source, msg, timePeriod, robot)
+    printNames(msg, key, json[key])
+
+printNames = (msg, key, json) ->
+  names = json.reduce (acc, item) -> acc + "\n" + item.name
+  msg.reply "I found #{names.length} #{key}\n\n #{names}"
+
+printCharts = (msg, json) -> 
+  printNames(msg, 'charts', json)
+
 
 module.exports = (robot) ->
-  robot.respond /graph me ([\w\.:\- ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?(?: source (.+))?$/i, (msg) ->
-    instrument = msg.match[1]
-    timePeriod = msg.match[2] || 'hour'
-    source = msg.match[3] || '*'
+  robot.respond /graph spaces/i, (msg) ->
+    user = process.env.HUBOT_LIBRATO_USER
+    pass = process.env.HUBOT_LIBRATO_TOKEN
+    auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
+    getSpaces(auth, robot, msg)
+
+  robot.respond /graphs ([\w\.:\- ]+?)\s*$/i, (msg) ->
+    space = msg.match[1]
+
+    user = process.env.HUBOT_LIBRATO_USER
+    pass = process.env.HUBOT_LIBRATO_TOKEN
+    auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
+    getChartsForSpace(auth, robot, msg, space)
+
+  robot.respond /graph me ([\w\.:\- ]+?)\/([\w\.:\- ]+?)\s*(?:over the (?:last|past)? )?(\d+ (?:second|minute|hour|day|week)s?)?(?: source (.+))?(?: type (.+))?$/i, (msg) ->
+    space = msg.match[1]
+    chart = msg.match[2]
+    timePeriod = msg.match[3] || 'hour'
+    source = msg.match[4] || '*'
+    type = msg.match[5] || 'line'
 
     user = process.env.HUBOT_LIBRATO_USER
     pass = process.env.HUBOT_LIBRATO_TOKEN
     auth = 'Basic ' + new Buffer(user + ':' + pass).toString('base64')
 
-    robot.http("https://metrics-api.librato.com/v1/instruments?name=#{escape(instrument)}")
-      .headers(Authorization: auth, Accept: 'application/json')
-      .get() (err, res, body) ->
-        switch res.statusCode
-          when 200
-            processIntrumentResponse(body, source, msg, timePeriod, robot)
-          else
-            msg.reply "Unable to get list of instruments from librato :(\nStatus Code: #{res.statusCode}\nBody:\n\n#{body}"
+    getSnapshot(auth, robot, msg, space, chart, source, type, timePeriod)
